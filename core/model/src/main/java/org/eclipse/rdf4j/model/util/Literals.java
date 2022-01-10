@@ -56,7 +56,6 @@ public class Literals {
 	}
 
 	public static String getLabel(Optional v, String fallback) {
-
 		return v != null ? getLabel((Value) v.orElseGet(null), fallback) : fallback;
 	}
 
