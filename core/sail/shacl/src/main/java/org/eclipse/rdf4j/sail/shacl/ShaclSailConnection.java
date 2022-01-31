@@ -35,6 +35,7 @@ import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailConnectionListener;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UpdateContext;
+import org.eclipse.rdf4j.sail.features.ConcurrentReadsSailConnection;
 import org.eclipse.rdf4j.sail.helpers.NotifyingSailConnectionWrapper;
 import org.eclipse.rdf4j.sail.memory.MemoryStore;
 import org.eclipse.rdf4j.sail.shacl.ShaclSail.TransactionSettings.ValidationApproach;
@@ -544,7 +545,13 @@ public class ShaclSailConnection extends NotifyingSailConnectionWrapper implemen
 	}
 
 	private boolean isParallelValidation() {
-		return transactionSettings.isParallelValidation();
+		boolean sailConnectionSupportsConcurrentReads = this instanceof ConcurrentReadsSailConnection
+				&& ((ConcurrentReadsSailConnection) this).supportsConcurrentReads();
+		if (transactionSettings.isParallelValidation() && !sailConnectionSupportsConcurrentReads) {
+			logger.info(
+					"Parallel validation is not supported because the base sail does not support concurrent reads on the same connection.");
+		}
+		return transactionSettings.isParallelValidation() && sailConnectionSupportsConcurrentReads;
 	}
 
 	void fillAddedAndRemovedStatementRepositories() {

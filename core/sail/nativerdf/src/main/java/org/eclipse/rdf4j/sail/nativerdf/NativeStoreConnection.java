@@ -17,12 +17,13 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.SailReadOnlyException;
 import org.eclipse.rdf4j.sail.base.SailSourceConnection;
+import org.eclipse.rdf4j.sail.features.ConcurrentReadsSailConnection;
 import org.eclipse.rdf4j.sail.helpers.DefaultSailChangedEvent;
 
 /**
  * @author Arjohn Kampman
  */
-public class NativeStoreConnection extends SailSourceConnection {
+public class NativeStoreConnection extends SailSourceConnection implements ConcurrentReadsSailConnection {
 
 	/*-----------*
 	 * Constants *
