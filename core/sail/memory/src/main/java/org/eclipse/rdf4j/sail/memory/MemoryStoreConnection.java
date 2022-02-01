@@ -8,6 +8,7 @@
 
 package org.eclipse.rdf4j.sail.memory;
 
+import org.eclipse.rdf4j.common.transaction.IsolationLevels;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
@@ -116,5 +117,10 @@ public class MemoryStoreConnection extends SailSourceConnection implements Concu
 
 	public MemoryStore getSail() {
 		return sail;
+	}
+
+	@Override
+	public boolean supportsConcurrentReads() {
+		return getTransactionIsolation() != null && getTransactionIsolation() != IsolationLevels.SERIALIZABLE;
 	}
 }

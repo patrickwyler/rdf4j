@@ -158,4 +158,9 @@ public class NativeStoreConnection extends SailSourceConnection implements Concu
 		sailChangedEvent.setStatementsRemoved(true);
 	}
 
+	@Override
+	public boolean supportsConcurrentReads() {
+		return getTransactionIsolation() != null && getTransactionIsolation() != IsolationLevels.SERIALIZABLE;
+	}
+
 }

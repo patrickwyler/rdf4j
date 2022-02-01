@@ -171,32 +171,7 @@ public class ShaclSailConnection extends NotifyingSailConnectionWrapper implemen
 	 *         without considering any sail level settings for things like caching or parallel validation.
 	 */
 	private Settings getLocalTransactionSettings() {
-		Settings localTransactionSettings = new Settings();
-
-		Arrays.stream(transactionSettingsRaw)
-				.filter(Objects::nonNull)
-				.forEach(setting -> {
-					if (setting instanceof ValidationApproach) {
-						localTransactionSettings.validationApproach = (ValidationApproach) setting;
-					}
-					if (setting instanceof ShaclSail.TransactionSettings.PerformanceHint) {
-						switch (((ShaclSail.TransactionSettings.PerformanceHint) setting)) {
-						case ParallelValidation:
-							localTransactionSettings.parallelValidation = true;
-							break;
-						case SerialValidation:
-							localTransactionSettings.parallelValidation = false;
-							break;
-						case CacheDisabled:
-							localTransactionSettings.cacheSelectedNodes = false;
-							break;
-						case CacheEnabled:
-							localTransactionSettings.cacheSelectedNodes = true;
-							break;
-						}
-					}
-				});
-		return localTransactionSettings;
+		return new Settings(this);
 	}
 
 	@Override
@@ -545,13 +520,12 @@ public class ShaclSailConnection extends NotifyingSailConnectionWrapper implemen
 	}
 
 	private boolean isParallelValidation() {
-		boolean sailConnectionSupportsConcurrentReads = this instanceof ConcurrentReadsSailConnection
-				&& ((ConcurrentReadsSailConnection) this).supportsConcurrentReads();
-		if (transactionSettings.isParallelValidation() && !sailConnectionSupportsConcurrentReads) {
-			logger.info(
-					"Parallel validation is not supported because the base sail does not support concurrent reads on the same connection.");
-		}
-		return transactionSettings.isParallelValidation() && sailConnectionSupportsConcurrentReads;
+		boolean sailConnectionSupportsConcurrentReads = supportsConcurrentReads();
+		assert !(transactionSettings.isParallelValidation() && !sailConnectionSupportsConcurrentReads);
+		assert !(getIsolationLevel() == IsolationLevels.SERIALIZABLE && transactionSettings
+				.isParallelValidation()) : "Concurrent reads is buggy for SERIALIZABLE transactions.";
+
+		return transactionSettings.isParallelValidation();
 	}
 
 	void fillAddedAndRemovedStatementRepositories() {
@@ -944,6 +918,7 @@ public class ShaclSailConnection extends NotifyingSailConnectionWrapper implemen
 		private Boolean parallelValidation;
 		private IsolationLevel isolationLevel;
 
+		@Deprecated(since = "4.0.0", forRemoval = true)
 		public Settings() {
 		}
 
@@ -957,6 +932,47 @@ public class ShaclSailConnection extends NotifyingSailConnectionWrapper implemen
 			}
 			this.parallelValidation = parallelValidation;
 			this.isolationLevel = isolationLevel;
+		}
+
+		public Settings(ShaclSailConnection connection) {
+
+			TransactionSetting[] transactionSettingsRaw = connection.transactionSettingsRaw;
+			assert transactionSettingsRaw != null;
+
+			ValidationApproach validationApproach = null;
+			Boolean cacheSelectedNodes = null;
+			Boolean parallelValidation = null;
+
+			for (TransactionSetting transactionSetting : transactionSettingsRaw) {
+				if (transactionSetting instanceof ValidationApproach) {
+					validationApproach = (ValidationApproach) transactionSetting;
+				} else if (transactionSetting instanceof ShaclSail.TransactionSettings.PerformanceHint) {
+					switch (((ShaclSail.TransactionSettings.PerformanceHint) transactionSetting)) {
+					case ParallelValidation:
+						parallelValidation = true;
+						break;
+					case SerialValidation:
+						parallelValidation = false;
+						break;
+					case CacheDisabled:
+						cacheSelectedNodes = false;
+						break;
+					case CacheEnabled:
+						cacheSelectedNodes = true;
+						break;
+					}
+
+				}
+			}
+
+			this.validationApproach = validationApproach;
+			this.cacheSelectedNodes = cacheSelectedNodes;
+
+			if (parallelValidation != null && parallelValidation) {
+				this.parallelValidation = connection.supportsConcurrentReads();
+			} else {
+				this.parallelValidation = parallelValidation;
+			}
 		}
 
 		public ValidationApproach getValidationApproach() {
@@ -1008,14 +1024,6 @@ public class ShaclSailConnection extends NotifyingSailConnectionWrapper implemen
 			}
 
 			assert transactionSettingsLocal.isolationLevel == null;
-
-			if (isolationLevel == IsolationLevels.SERIALIZABLE) {
-				if (parallelValidation) {
-					logger.warn("Parallel validation is not compatible with SERIALIZABLE isolation level!");
-				}
-
-				parallelValidation = false;
-			}
 
 		}
 
