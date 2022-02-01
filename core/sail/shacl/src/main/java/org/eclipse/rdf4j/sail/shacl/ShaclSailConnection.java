@@ -520,8 +520,7 @@ public class ShaclSailConnection extends NotifyingSailConnectionWrapper implemen
 	}
 
 	private boolean isParallelValidation() {
-		boolean sailConnectionSupportsConcurrentReads = supportsConcurrentReads();
-		assert !(transactionSettings.isParallelValidation() && !sailConnectionSupportsConcurrentReads);
+		assert !(transactionSettings.isParallelValidation() && !supportsConcurrentReads());
 		assert !(getIsolationLevel() == IsolationLevels.SERIALIZABLE && transactionSettings
 				.isParallelValidation()) : "Concurrent reads is buggy for SERIALIZABLE transactions.";
 
@@ -858,7 +857,7 @@ public class ShaclSailConnection extends NotifyingSailConnectionWrapper implemen
 				logger.debug("Transaction size limit exceeded, reverting to bulk validation.");
 				removeConnectionListener(this);
 				Settings bulkValidation = getLocalTransactionSettings();
-				bulkValidation.validationApproach = ShaclSail.TransactionSettings.ValidationApproach.Bulk;
+				bulkValidation.setValidationApproach(ShaclSail.TransactionSettings.ValidationApproach.Bulk);
 				getTransactionSettings().applyTransactionSettings(bulkValidation);
 				removedStatementsSet.clear();
 				addedStatementsSet.clear();
@@ -917,6 +916,7 @@ public class ShaclSailConnection extends NotifyingSailConnectionWrapper implemen
 		private Boolean cacheSelectedNodes;
 		private Boolean parallelValidation;
 		private IsolationLevel isolationLevel;
+		transient private Settings previous = null;
 
 		@Deprecated(since = "4.0.0", forRemoval = true)
 		public Settings() {
@@ -968,11 +968,19 @@ public class ShaclSailConnection extends NotifyingSailConnectionWrapper implemen
 			this.validationApproach = validationApproach;
 			this.cacheSelectedNodes = cacheSelectedNodes;
 
-			if (parallelValidation != null && parallelValidation) {
-				this.parallelValidation = connection.supportsConcurrentReads();
+			if (!connection.supportsConcurrentReads()) {
+				this.parallelValidation = false;
 			} else {
 				this.parallelValidation = parallelValidation;
 			}
+		}
+
+		private Settings(Settings settings) {
+			this.validationApproach = settings.validationApproach;
+			this.cacheSelectedNodes = settings.cacheSelectedNodes;
+			this.parallelValidation = settings.parallelValidation;
+			this.isolationLevel = settings.isolationLevel;
+			this.previous = settings.previous;
 		}
 
 		public ValidationApproach getValidationApproach() {
@@ -1003,6 +1011,9 @@ public class ShaclSailConnection extends NotifyingSailConnectionWrapper implemen
 		}
 
 		void applyTransactionSettings(Settings transactionSettingsLocal) {
+
+			previous = new Settings(this);
+
 			// get the most significant validation approach first (eg. if validation is disabled on the sail level, then
 			// validation can not be enabled on the transaction level
 			validationApproach = getMostSignificantValidationApproach(validationApproach,
@@ -1046,6 +1057,22 @@ public class ShaclSailConnection extends NotifyingSailConnectionWrapper implemen
 				parallelValidation = false;
 				cacheSelectedNodes = false;
 			}
+		}
+
+		private void setValidationApproach(ValidationApproach validationApproach) {
+			this.validationApproach = validationApproach;
+		}
+
+		private void setCacheSelectedNodes(Boolean cacheSelectedNodes) {
+			this.cacheSelectedNodes = cacheSelectedNodes;
+		}
+
+		private void setParallelValidation(Boolean parallelValidation) {
+			this.parallelValidation = parallelValidation;
+		}
+
+		private void setIsolationLevel(IsolationLevel isolationLevel) {
+			this.isolationLevel = isolationLevel;
 		}
 	}
 
