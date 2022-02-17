@@ -24,6 +24,7 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizerTest;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
+import org.eclipse.rdf4j.query.algebra.helpers.AbstractSimpleQueryModelVisitor;
 import org.eclipse.rdf4j.query.parser.ParsedQuery;
 import org.eclipse.rdf4j.query.parser.QueryParserUtil;
 import org.eclipse.rdf4j.query.parser.sparql.SPARQLParser;
@@ -176,9 +177,13 @@ public class QueryJoinOptimizerTest extends QueryOptimizerTest {
 		assertEquals(expected, actual);
 	}
 
-	class JoinFinder extends AbstractQueryModelVisitor<RuntimeException> {
+	static class JoinFinder extends AbstractSimpleQueryModelVisitor<RuntimeException> {
 
 		private Join join;
+
+		JoinFinder() {
+			super(true);
+		}
 
 		@Override
 		public void meet(Join join) {
